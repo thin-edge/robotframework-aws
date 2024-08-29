@@ -1,0 +1,86 @@
+name: Test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  merge_group:
+jobs:
+  approve:
+    name: Approve
+    environment:
+      # For security reasons, all pull requests need to be approved first before granting access to secrets
+      # So the environment should be set to have a reviewer/s inspect it before approving it
+      name: ${{ github.event_name == 'pull_request_target' && 'Test Pull Request' || 'Test Auto'  }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for approval
+        run: echo "Approved"
+
+  test:
+    name: Test ${{ matrix.os }} - ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    needs: [approve]
+    permissions:
+      pull-requests: write
+    environment:
+      name: Test Auto
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      # Checkout either the PR or the branch
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{matrix.python-version}}"
+          cache: 'pip'
+          cache-dependency-path: |
+            pyproject.toml
+
+      - uses: extractions/setup-just@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          just venv
+      
+      - name: create .env file
+        run: |
+          touch .env
+          echo 'AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"' >> .env
+          echo 'AWS_ACCESS_KEY="${{ secrets.AWS_ACCESS_KEY }}"' >> .env
+          echo 'AWS_REGION="${{ secrets.AWS_REGION }}"' >> .env
+
+      - name: Run tests
+        run: just test
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reports-${{ matrix.os }}-${{ matrix.python-version }}
+          path: output
+
+      - name: Send report to commit
+        if: ${{ always() && github.event_name == 'pull_request_target' }}
+        uses: "joonvena/robotframework-reporter-action@v2.5"
+        with:
+          report_path: output
+          gh_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+  passed:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - run: |
+          echo Tests passed

@@ -1,0 +1,10 @@
+build/
+*.egg-info/
+.env
+__pycache__/
+.DS_Store
+AWS/_version.py
+wordlist.txt
+.venv/
+*.html
+*.xml
