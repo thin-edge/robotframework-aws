@@ -7,6 +7,6 @@ venv:
     [ -d .venv ] || python3 -m venv .venv
     {{venv_bin}}/pip3 install .
 
-# Run unit tests
-test:
-    {{venv_bin}}/python3 -m unittest -v
+# Run tests
+test *args='':
+    {{venv_bin}}/python3 -m robot.run --outputdir output {{args}} tests
