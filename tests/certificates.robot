@@ -6,7 +6,7 @@ Library             AWS
 *** Test Cases ***
 
 Create certificate key pair
-    ${certs}=    AWS.Create Certificate
+    ${certs}=    AWS.Create Certificate Key Pair
     Should Not Be Empty    ${certs}
     [Teardown]    Delete Certificate    ${certs["certificateId"]}
 
