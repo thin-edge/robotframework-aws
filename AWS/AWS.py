@@ -81,7 +81,8 @@ class AWS:
         # Load settings from global variable
         self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
 
-        self._create_session(self.access_key_id, self.access_key, self.region)
+        # Note: don't initialize session in the constructor as it can prevent
+        # the RF language server from reading the keywords
 
         # pylint: disable=invalid-name
         self.ROBOT_LIBRARY_LISTENER = self
@@ -169,6 +170,10 @@ class AWS:
     @property
     def iot_client(self):
         """Get AWS IoT Client"""
+        if not self.session:
+            # lazy initialization of session
+            self._create_session(self.access_key_id, self.access_key, self.region)
+
         if not self._iot_client:
             self._iot_client = self.session.client("iot")
         return self._iot_client
