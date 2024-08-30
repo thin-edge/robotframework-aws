@@ -12,7 +12,7 @@ import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from robot.api.deco import keyword, library
-from robot.libraries.BuiltIn import BuiltIn
+from robot.libraries.BuiltIn import BuiltIn, RobotNotRunningError
 
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -78,6 +78,12 @@ class AWS:
         self.config = {}
 
         load_dotenv()
+
+        # Load settings from global variable
+        try:
+            self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
+        except RobotNotRunningError:
+            pass
 
         # Note: don't initialize session in the constructor as it can prevent
         # the RF language server from reading the keywords
