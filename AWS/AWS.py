@@ -75,11 +75,9 @@ class AWS:
         self._iot_client = None
         self.session: boto3.Session = None
         self._account_id = ""
+        self.config = {}
 
         load_dotenv()
-
-        # Load settings from global variable
-        self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
 
         # Note: don't initialize session in the constructor as it can prevent
         # the RF language server from reading the keywords
@@ -155,6 +153,9 @@ class AWS:
         Returns a success message if the session creation is successful.
         """
         try:
+            # Load settings from global variable
+            self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
+
             self.session = boto3.Session(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
