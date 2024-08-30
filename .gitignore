@@ -8,3 +8,4 @@ wordlist.txt
 .venv/
 *.html
 *.xml
+*.pem
