@@ -73,7 +73,7 @@ class AWS:
     ):
         self._on_cleanup = []
         self._iot_client = None
-        self.session: boto3.Session = None
+        self._session: boto3.Session = None
         self._account_id = ""
         self.config = {}
 
@@ -84,9 +84,6 @@ class AWS:
             self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
         except RobotNotRunningError:
             pass
-
-        # Note: don't initialize session in the constructor as it can prevent
-        # the RF language server from reading the keywords
 
         # pylint: disable=invalid-name
         self.ROBOT_LIBRARY_LISTENER = self
@@ -113,6 +110,16 @@ class AWS:
             account_id = self.session.client("sts").get_caller_identity()["Account"]
             self._account_id = account_id
         return self._account_id
+
+    @property
+    def session(self):
+        """AWS Session"""
+        # lazy initialization of session
+        if self._session is None:
+            self._session = self._create_session(
+                self.access_key_id, self.access_key, self.region
+            )
+        return self._session
 
     #
     # Hooks
@@ -162,7 +169,7 @@ class AWS:
             # Load settings from global variable
             self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
 
-            self.session = boto3.Session(
+            self._session = boto3.Session(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 region_name=region_name,
@@ -170,17 +177,13 @@ class AWS:
             # Try to create an IoT client to verify the session
             # Perform a simple operation like listing IoT policies to verify the connection
             self.get_iot_url()
-            return self.session
+            return self._session
         except ClientError as e:
             raise RuntimeError("Failed to create AWS session") from e
 
     @property
     def iot_client(self):
         """Get AWS IoT Client"""
-        if not self.session:
-            # lazy initialization of session
-            self._create_session(self.access_key_id, self.access_key, self.region)
-
         if not self._iot_client:
             self._iot_client = self.session.client("iot")
         return self._iot_client
