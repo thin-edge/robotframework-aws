@@ -95,7 +95,8 @@ jobs:
           path: output
 
       - name: Send report to commit
-        if: ${{ always() && github.event_name == 'pull_request_target' }}
+        # Only publish reports for linux machines
+        if: ${{ always() && github.event_name == 'pull_request_target' && matrix.os == 'ubuntu-latest' }}
         uses: "joonvena/robotframework-reporter-action@v2.5"
         with:
           report_path: output
