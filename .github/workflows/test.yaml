@@ -7,6 +7,24 @@ on:
       - main
   merge_group:
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        run: |
+          just venv
+          just install_dev
+      - name: Check format
+        run: |
+          just check-format
+      - name: Check lint
+        run: |
+          just check-lint
+
   approve:
     name: Approve
     environment:
