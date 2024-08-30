@@ -1,6 +1,9 @@
 """AWS library for Robot Framework"""
+
 from importlib.metadata import version, PackageNotFoundError
 from .AWS import AWS
+
+# pylint: disable=invalid-name
 
 try:
     __version__ = version("AWS")

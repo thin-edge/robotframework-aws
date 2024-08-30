@@ -1,9 +1,14 @@
 """AWS IoT Policy generator"""
+
 import json
 from typing import Dict, Any
 
+# pylint: disable=too-few-public-methods
+
 
 class Policy:
+    """thin-edge.io IoT Policy definitions"""
+
     template = """
 {
   "Version": "2012-10-17",
@@ -49,6 +54,7 @@ class Policy:
 """
 
     def create(self, region="", account_id="") -> Dict[str, Any]:
+        """Create an AWS policy definition for thin-edge.io"""
         policy = self.template
         policy = policy.replace(r"{{REGION}}", region)
         policy = policy.replace(r"{{ACCOUNT_ID}}", account_id)

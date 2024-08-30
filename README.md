@@ -64,3 +64,26 @@ Or the more interactive html documentation using:
 ```sh
 libdoc AWS/AWS.py AWS/AWS.html
 ```
+
+## Development
+
+Before submitting a PR, make sure you run the formatting and linting against your code to ensure you don't have an formatting or linting errors.
+
+You can run the formatting and linting by first installing the development dependencies, using the following [just](https://github.com/casey/just) tasks:
+
+```sh
+just venv
+just install_dev
+```
+
+After the dependencies have been installed, run the linting/formatting task and check the output.
+
+```sh
+just lint
+```
+
+The pylint output should rate your code as 10.00/10. Below is an example of the console output:
+
+```
+Your code has been rated at 10.00/10 (previous run: 10.00/10, +0.00)
+```
