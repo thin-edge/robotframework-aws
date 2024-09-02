@@ -5,6 +5,7 @@ import datetime
 import json
 import logging
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -39,6 +40,16 @@ except Exception:
     __version__ = "0.0.0"
 
 __author__ = "thin-edge.io"
+
+
+@dataclass
+class ThingData:
+    """Thing Data"""
+
+    name: str
+    policy_name: str
+    private_key: str
+    public_key: str
 
 
 @library(scope="GLOBAL", auto_keywords=False)
@@ -618,6 +629,7 @@ class AWS:
         name: str,
         thing_type: str = "",
         attributes: Optional[Dict[str, Any]] = None,
+        certificate_arn: Optional[str] = None,
         auto_delete: bool = True,
     ) -> Dict[str, Any]:
         """Create Thing
@@ -626,9 +638,11 @@ class AWS:
             name (str): Thing name
             thing_type (str, optional): Thing type. Defaults to None
             attributes (Dict[str, Any], optional): Thing attributes payload. Defaults to None
+            certificate_arn (str, optional): Certificate ARN to be attached as the thing principal
             auto_delete (bool, optional): Automatically delete thing on suite teardown.
                 Defaults to True
         """
+        # pylint: disable=too-many-arguments
         options = {
             "thingName": name,
         }
@@ -641,6 +655,19 @@ class AWS:
         response = self.iot_client.create_thing(**options)
         if auto_delete:
             self.append_cleanup(self.delete_thing, name)
+
+        if certificate_arn:
+            self.iot_client.attach_thing_principal(
+                thingName=name,
+                principal=certificate_arn,
+            )
+            if auto_delete:
+                self.prepend_cleanup(
+                    self.iot_client.detach_thing_principal,
+                    thingName=name,
+                    principal=certificate_arn,
+                )
+
         return response
 
     @keyword("Thing Should Exist")
@@ -691,3 +718,55 @@ class AWS:
             options["expectedVersion"] = expected_version
 
         self.iot_client.delete_thing(**options)
+
+    #
+    # Composite
+    #
+    @keyword("Create Thing With Self-Signed Certificate")
+    def create_thing_with_self_signed_certificates(
+        self,
+        name: str = "",
+        policy_name: str = "",
+        thing_type: str = "",
+        auto_delete: bool = True,
+    ) -> ThingData:
+        """Create thing with newly generated self-signed certificate (private and public key)
+
+        Random values are used for the name and policy name if they are not provided.
+
+        Arguments:
+            name (str, optional): Thing name. A randomly generated value is used if one
+                is not provided
+            policy_name (str, optional): Policy name to be attached to the thing.
+                If a name is not provided then a new policy will be created with a randomly
+                generated name.
+            thing_type (str, optional): Thing type. Defaults to None
+            auto_delete (bool, optional): Automatically delete thing on suite teardown.
+                Defaults to True
+        """
+        if not name:
+            name = self.get_random_name()
+
+        if not policy_name:
+            policy_name = self.get_random_name()
+            self.create_policy(name=policy_name, auto_delete=auto_delete)
+
+        cert_key_path = self.create_cert_private_key(auto_delete=auto_delete)
+        public_key = self.create_self_signed_certificate(
+            cert_key_path, common_name=name
+        )
+        cert_response = self.register_certificate(
+            public_key, policy_name=policy_name, auto_delete=auto_delete
+        )
+        self.create_thing(
+            name,
+            thing_type=thing_type,
+            certificate_arn=cert_response["certificateArn"],
+            auto_delete=auto_delete,
+        )
+        return ThingData(
+            name=name,
+            policy_name=policy_name,
+            private_key=Path(cert_key_path).read_text(encoding="utf-8"),
+            public_key=public_key,
+        )
