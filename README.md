@@ -7,19 +7,25 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
 1. Install via pip
 
     ```sh
-    pip install git+https://github.com/reubenmiller/robotframework-aws.git@0.0.1
+    pip install git+https://github.com/reubenmiller/robotframework-aws.git@main
     ```
 
     Or add it to your `requirements.txt` file
 
     ```sh
-    robotframework-aws @ git+https://github.com/reubenmiller/robotframework-aws.git@0.0.1
+    robotframework-aws @ git+https://github.com/reubenmiller/robotframework-aws.git@main
     ```
 
     Then install it via
 
     ```sh
     pip install -r requirements.txt
+    ```
+
+    Alternatively you can install a specific version using:
+
+    ```sh
+    robotframework-aws @ git+https://github.com/reubenmiller/robotframework-aws.git@0.0.7
     ```
 
 2. Create a `.env` file with the following environment variables
@@ -36,13 +42,15 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
     *** Settings ***
     Library    AWS
 
+
     *** Test Cases ***
     Example
-        Create Policy   myiotdevice
-        ${aws_url}=     Get IoT URL
-        DeviceLibrary.Setup
-        DeviceLibrary.Execute Command     tedge config set aws.url ${aws_url}
-        DeviceLibrary.Execute Command     tedge connect aws
+        ${device_name}=     DeviceLibrary.Setup
+        ${aws}=     AWS.Create Thing With Self-Signed Certificate    name=${device_name}
+        DeviceLibrary.Execute Command    printf -- '${aws.private_key}' > $(tedge config get device.key_path)
+        DeviceLibrary.Execute Command    printf -- '${aws.public_key}' > $(tedge config get device.cert_path)
+        DeviceLibrary.Execute Command    sudo tedge config set aws.url ${aws.url}
+        ${stdout}=    DeviceLibrary.Execute Command    sudo tedge connect aws    retries=0
     ```
 
 4. Run the test
