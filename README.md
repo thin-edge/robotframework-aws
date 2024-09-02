@@ -41,6 +41,7 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
     ```robot
     *** Settings ***
     Library    AWS
+    Library    DeviceLibrary
 
 
     *** Test Cases ***
@@ -52,6 +53,10 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
         DeviceLibrary.Execute Command    sudo tedge config set aws.url ${aws.url}
         ${stdout}=    DeviceLibrary.Execute Command    sudo tedge connect aws    retries=0
     ```
+
+    **Note**
+
+    The above example uses the [robotframework-devicelibrary](https://github.com/reubenmiller/robotframework-devicelibrary)
 
 4. Run the test
 
