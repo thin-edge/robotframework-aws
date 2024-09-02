@@ -50,6 +50,7 @@ class ThingData:
     policy_name: str
     private_key: str
     public_key: str
+    url: str
 
 
 @library(scope="GLOBAL", auto_keywords=False)
@@ -764,9 +765,11 @@ class AWS:
             certificate_arn=cert_response["certificateArn"],
             auto_delete=auto_delete,
         )
+
         return ThingData(
             name=name,
             policy_name=policy_name,
             private_key=Path(cert_key_path).read_text(encoding="utf-8"),
             public_key=public_key,
+            url=self.get_iot_url(),
         )
