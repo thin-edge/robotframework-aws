@@ -26,7 +26,7 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
 
     ```sh
     AWS_ACCESS_KEY_ID=ABCDEFGHI
-    AWS_ACCESS_KEY=<secret>
+    AWS_SECRET_ACCESS_KEY=<secret>
     AWS_REGION=us-east-1
     ```
 
