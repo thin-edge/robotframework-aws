@@ -10,13 +10,15 @@ Start/stop MQTT logger
     AWS.Stop MQTT Logger
 
 Assert message count
-    ${name}    AWS.Start MQTT Logger    hello
-    Publish MQTT Message    hello    world
-    ${messages}=    Should Have MQTT Messages    min_count=1
+    ${topic}=    AWS.Get Random Name
+    ${name}    AWS.Start MQTT Logger    ${topic}
+    Publish MQTT Message    ${topic}    world
+    ${messages}=    Should Have MQTT Messages    topic=${topic}        min_count=1
     Should Not Be Empty    ${messages}
 
 Assert MQTT message
-    ${name}    AWS.Start MQTT Logger    hello
-    Publish MQTT Message    hello    world
-    ${messages}=    Should Have MQTT Messages    topic=hello
+    ${topic}=    AWS.Get Random Name
+    ${name}    AWS.Start MQTT Logger    ${topic}
+    Publish MQTT Message    ${topic}    world
+    ${messages}=    Should Have MQTT Messages    topic=${topic}
     Should Not Be Empty    ${messages}
