@@ -319,10 +319,9 @@ class AWS:
                 if exists_ok:
                     return self.get_policy(name)
                 raise
+            raise
         except json.JSONDecodeError as e:
             raise RuntimeError("Error decoding JSON") from e
-
-        raise RuntimeError("Unexpected error. The code should not reach here")
 
     #
     # Certificates
