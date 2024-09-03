@@ -7,7 +7,7 @@ import logging
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -23,6 +23,8 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from .policy import Policy
 from .random import random_name
+from .mqtt_logger import MQTTLogger, MQTTLoggerOptions, RelativeTime
+from .retry import configure_retry_on_members
 
 IoTPolicy = Dict[str, Any]
 
@@ -79,15 +81,21 @@ class AWS:
 
     ROBOT_LISTENER_API_VERSION = 3
 
+    # Default parameter settings
+    DEFAULT_TIMEOUT = 30
+
     # Constructor
     def __init__(
         self,
+        timeout: str = DEFAULT_TIMEOUT,
     ):
         self._on_cleanup = []
         self._iot_client = None
         self._session: boto3.Session = None
         self._account_id = ""
         self.config = {}
+        self._mqtt_loggers = {}
+        self._active_mqtt_logger = None
 
         load_dotenv()
 
@@ -96,6 +104,9 @@ class AWS:
             self.config = BuiltIn().get_variable_value(r"&{AWS_CONFIG}", {}) or {}
         except RobotNotRunningError:
             pass
+
+        # Enable retries on assertions
+        configure_retry_on_members(self, "^assert_.+", timeout=timeout)
 
         # pylint: disable=invalid-name
         self.ROBOT_LIBRARY_LISTENER = self
@@ -672,7 +683,7 @@ class AWS:
         return response
 
     @keyword("Thing Should Exist")
-    def assert_thing_exists(self, name: str):
+    def assert_thing_exists(self, name: str, **kwargs):
         """Assert the existence of a thing
 
         Arguments:
@@ -685,7 +696,7 @@ class AWS:
         return response
 
     @keyword("Thing Should Not Exist")
-    def assert_thing_does_not_exist(self, name: str):
+    def assert_thing_does_not_exist(self, name: str, **kwargs):
         """Assert that a Thing does not exist
 
         Arguments:
@@ -693,7 +704,9 @@ class AWS:
         """
         exists = True
         try:
-            self.assert_thing_exists(name)
+            self.iot_client.describe_thing(
+                thingName=name,
+            )
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
                 exists = False
@@ -773,3 +786,188 @@ class AWS:
             public_key=public_key,
             url=self.get_iot_url(),
         )
+
+    #
+    # Topics
+    #
+    def _get_aws_target(self, topic) -> str:
+        return ":".join([i for i in topic.split("/")[1:5] if i])
+
+    @keyword("Get Local Command Topic")
+    def get_local_command_topic(self, topic_suffix: str = "") -> str:
+        """Get the AWS IoT Command topic which users can publish to in AWS
+        and it will be received by thin-edge.io on the device
+
+        Below is an example showing the cloud topic format:
+            aws/cmd/{topic_suffix}
+        """
+        return "/".join(
+            [
+                "aws",
+                "cmd",
+                topic_suffix,
+            ]
+        )
+
+    @keyword("Get Cloud Command Topic")
+    def get_cloud_command_topic(self, common_name: str, topic_suffix: str = "") -> str:
+        """Get the AWS IoT Command topic which users can publish to in AWS
+        and it will be received by thin-edge.io on the device
+
+        Below is an example showing the topic mapping:
+            thinedge/device001/cmd/{topic_suffix}
+        """
+        return "/".join(
+            [
+                "thinedge",
+                common_name,
+                "cmd",
+                topic_suffix,
+            ]
+        )
+
+    @keyword("Get Cloud Telemetry Topic")
+    def get_cloud_telemetry_topic(self, common_name: str, te_topic: str) -> str:
+        """Get the cloud topic for telemetry data given a local thin-edge.io
+        topic (and the device's certificate's common name)
+
+        Given a device common name: device001, the following shows how the
+        input topic will be converted to the cloud topic:
+
+          (input) te topic: te/device/main///m/environment
+          (output) cloud topic: thinedge/device001/td/device:main/m/environment
+        """
+        # topic shadow/# both 1 aws/ $aws/things/TST_crash_refined_albarino/
+
+        parts = te_topic.split("/")
+        output_parts = [
+            "thinedge",
+            common_name,
+            "td",
+            self._get_aws_target(te_topic),
+        ]
+
+        if len(parts) > 5:
+            output_parts.extend(parts[5:])
+
+        return "/".join(output_parts)
+
+    @keyword("Get Cloud Shadow Topic")
+    def get_cloud_shadow_topic(self, common_name: str, topic_suffix: str = "") -> str:
+        """Get the cloud topic shadow topic
+
+        Given a device common name: device001, the cloud topic would be:
+          $aws/things/device001/shadow/{topic_suffix}
+        """
+        return "/".join(
+            [
+                "$aws",
+                "things",
+                common_name,
+                "shadow",
+                topic_suffix,
+            ]
+        )
+
+    @keyword("Get Local Shadow Topic")
+    def get_local_shadow_topic(self, topic_suffix: str = "") -> str:
+        """Get the cloud topic shadow topic
+
+        Given a device common name: device001, the cloud topic would be:
+            aws/shadow/{topic_suffix}
+        """
+        return "/".join(
+            [
+                "aws",
+                "shadow",
+                topic_suffix,
+            ]
+        )
+
+    def mqtt_logger(self, client_id: Optional[str] = None) -> MQTTLogger:
+        """Get an mqtt logger
+
+        Arguments:
+            client_id (str, optional): MQTT Client id used to uniquely identify
+                the logger
+        """
+        if not client_id:
+            client_id = self._active_mqtt_logger
+
+        if client_id not in self._mqtt_loggers:
+            options = MQTTLoggerOptions(
+                host=self.get_iot_url(),
+                client_id=f"MQTTLogger-{client_id}",
+                use_websocket=True,
+            )
+            mqtt_logger = MQTTLogger(options)
+            self._mqtt_loggers[client_id] = mqtt_logger
+        return self._mqtt_loggers.get(client_id)
+
+    #
+    # MQTT Pub/Sub
+    #
+    @keyword("Start MQTT Logger")
+    def start_mqtt_logger(self, topic: str = "#", client_id: Optional[str] = None):
+        """Start the MQTT Logger"""
+
+        if client_id is None:
+            client_id = self.get_random_name()
+
+        mqtt_logger = self.mqtt_logger(client_id)
+        self._active_mqtt_logger = client_id
+        mqtt_logger.start(topic)
+        self.append_cleanup(mqtt_logger.stop)
+
+    @keyword("Stop MQTT Logger")
+    def stop_mqtt_logger(self, client_id: Optional[str] = None) -> List[Any]:
+        """Stop the MQTT Logger"""
+        return self.mqtt_logger(client_id).stop()
+
+    @keyword("Publish MQTT Message")
+    def publish_mqtt_message(
+        self,
+        topic: str,
+        message: str = "",
+        qos: int = 1,
+        client_id: Optional[str] = None,
+    ):
+        """Publish an MQTT message"""
+        self.mqtt_logger(client_id).publish(topic, message, qos)
+
+    @keyword("Should Have MQTT Messages")
+    def assert_mqtt_messages(
+        self,
+        topic: Optional[str] = None,
+        min_count: Optional[int] = 1,
+        max_count: Optional[int] = None,
+        date_from: Optional[RelativeTime] = None,
+        date_to: Optional[RelativeTime] = None,
+        client_id: Optional[str] = None,
+    ) -> List[Any]:
+        """Assert the presence of an MQTT message
+
+        Arguments:
+            topic (str, optional): Only includes matching topics. Accepts MQTT patterns
+            min_count (int, optional): Minimum number of messages expected. Defaults to 1
+            max_count (int, optional): Maximum number of messages expected.
+                Defaults to None
+            date_from: Only include messages with a timestamp greater or equal to the value.
+                Defaults to None
+            date_to: Only include messages with a timestamp less or equal to the value.
+                Defaults to None
+
+        Returns:
+            List[Any]: List of matching MQTT messages
+        """
+        messages = self.mqtt_logger(client_id).match_mqtt_messages(
+            topic=topic, date_from=date_from, date_to=date_to
+        )
+
+        if min_count is not None:
+            assert len(messages) >= min_count
+
+        if max_count is not None:
+            assert len(messages) <= max_count
+
+        return messages
