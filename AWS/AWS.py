@@ -887,11 +887,10 @@ class AWS:
     @keyword("Start MQTT Logger")
     def start_mqtt_logger(self, topic: str = "#"):
         """Start the MQTT Logger"""
-        if self._mqtt_logger:
-            return
+        if not self._mqtt_logger:
+            options = MQTTLoggerOptions(host=self.get_iot_url(), use_websocket=True)
+            self._mqtt_logger = MQTTLogger(options)
 
-        options = MQTTLoggerOptions(host=self.get_iot_url(), use_websocket=True)
-        self._mqtt_logger = MQTTLogger(options)
         self._mqtt_logger.start(topic)
         self.append_cleanup(self.stop_mqtt_logger)
 

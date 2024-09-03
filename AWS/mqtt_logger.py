@@ -165,10 +165,8 @@ class MQTTLogger:
 
     def start(self, topic: str, qos: int = 1):
         """Start the MQTT Logger if it has not already been started"""
-        if self._client:
-            return
-
-        self._client = self.create()
+        if not self._client:
+            self._client = self.create()
 
         # Connect and subscribe to AWS IoT
         assert self._client.connect(), "Could not connect AWS MQTT Client"
@@ -185,6 +183,7 @@ class MQTTLogger:
     def stop(self) -> List[Any]:
         """Stop the MQTT logger"""
         self._client.disconnectAsync()
+
         return [*self._messages]
 
     def match_mqtt_messages(
