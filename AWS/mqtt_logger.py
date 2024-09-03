@@ -6,7 +6,6 @@ import re
 import json
 from dataclasses import dataclass
 from typing import Any, List, Dict, Optional
-from threading import Event
 
 import certifi
 from AWSIoTPythonSDK.MQTTLib import AWSIoTMQTTClient
@@ -117,6 +116,8 @@ class MQTTLogger:
         self.options = options
         self._client = None
         self._messages = []
+        self.online = False
+        self.started = False
 
     @property
     def messages(self) -> List[Message]:
@@ -130,7 +131,9 @@ class MQTTLogger:
         # init client
         aws_client = None
         if self.options.use_websocket:
-            aws_client = AWSIoTMQTTClient(options.client_id, useWebsocket=True)
+            aws_client = AWSIoTMQTTClient(
+                options.client_id, useWebsocket=True, cleanSession=True
+            )
             aws_client.configureEndpoint(options.host, options.port)
             aws_client.configureCredentials(options.root_ca)
         else:
@@ -145,11 +148,19 @@ class MQTTLogger:
             -1
         )  # Infinite offline Publish queueing
         aws_client.configureDrainingFrequency(2)
-        aws_client.configureConnectDisconnectTimeout(10)
-        aws_client.configureMQTTOperationTimeout(5)
+        aws_client.configureConnectDisconnectTimeout(30)
+        aws_client.configureMQTTOperationTimeout(10)
         aws_client.onMessage = self.__on_message
+        aws_client.onOnline = self.__on_online
+        aws_client.onOffline = self.__on_offline
         aws_client.disableMetricsCollection()
         return aws_client
+
+    def __on_online(self):
+        self.online = True
+
+    def __on_offline(self):
+        self.online = False
 
     def __on_message(self, message: MQTTMessage):
         logger.info("Received new message")
@@ -163,26 +174,24 @@ class MQTTLogger:
             QoS=qos,
         )
 
-    def start(self, topic: str, qos: int = 1):
+    def start(self, topic: str = "#", qos: int = 1):
         """Start the MQTT Logger if it has not already been started"""
+        self.started = True
         if not self._client:
             self._client = self.create()
 
         # Connect and subscribe to AWS IoT
         assert self._client.connect(), "Could not connect AWS MQTT Client"
+        self._client.subscribe(topic, qos, self.__sub_callback)
 
-        event = Event()
-
-        def acked(*_args, **_kwargs):
-            logger.info("Subscription acknowledged")
-            event.set()
-
-        self._client.subscribeAsync(topic, qos, ackCallback=acked)
-        event.wait(5)
+    def __sub_callback(self, _client, _userdata, _message):
+        pass
 
     def stop(self) -> List[Any]:
         """Stop the MQTT logger"""
-        self._client.disconnectAsync()
+        if self.started:
+            self.started = False
+            assert self._client.disconnect()
 
         return [*self._messages]
 

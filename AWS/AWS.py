@@ -94,7 +94,8 @@ class AWS:
         self._session: boto3.Session = None
         self._account_id = ""
         self.config = {}
-        self._mqtt_logger = None
+        self._mqtt_loggers = {}
+        self._active_mqtt_logger = None
 
         load_dotenv()
 
@@ -682,7 +683,7 @@ class AWS:
         return response
 
     @keyword("Thing Should Exist")
-    def assert_thing_exists(self, name: str):
+    def assert_thing_exists(self, name: str, **kwargs):
         """Assert the existence of a thing
 
         Arguments:
@@ -695,7 +696,7 @@ class AWS:
         return response
 
     @keyword("Thing Should Not Exist")
-    def assert_thing_does_not_exist(self, name: str):
+    def assert_thing_does_not_exist(self, name: str, **kwargs):
         """Assert that a Thing does not exist
 
         Arguments:
@@ -703,7 +704,9 @@ class AWS:
         """
         exists = True
         try:
-            self.assert_thing_exists(name)
+            self.iot_client.describe_thing(
+                thingName=name,
+            )
         except ClientError as e:
             if e.response["Error"]["Code"] == "ResourceNotFoundException":
                 exists = False
@@ -881,28 +884,56 @@ class AWS:
             ]
         )
 
+    def mqtt_logger(self, client_id: Optional[str] = None) -> MQTTLogger:
+        """Get an mqtt logger
+
+        Arguments:
+            client_id (str, optional): MQTT Client id used to uniquely identify
+                the logger
+        """
+        if not client_id:
+            client_id = self._active_mqtt_logger
+
+        if client_id not in self._mqtt_loggers:
+            options = MQTTLoggerOptions(
+                host=self.get_iot_url(),
+                client_id=f"MQTTLogger-{client_id}",
+                use_websocket=True,
+            )
+            mqtt_logger = MQTTLogger(options)
+            self._mqtt_loggers[client_id] = mqtt_logger
+        return self._mqtt_loggers.get(client_id)
+
     #
     # MQTT Pub/Sub
     #
     @keyword("Start MQTT Logger")
-    def start_mqtt_logger(self, topic: str = "#"):
+    def start_mqtt_logger(self, topic: str = "#", client_id: Optional[str] = None):
         """Start the MQTT Logger"""
-        if not self._mqtt_logger:
-            options = MQTTLoggerOptions(host=self.get_iot_url(), use_websocket=True)
-            self._mqtt_logger = MQTTLogger(options)
 
-        self._mqtt_logger.start(topic)
-        self.append_cleanup(self.stop_mqtt_logger)
+        if client_id is None:
+            client_id = self.get_random_name()
+
+        mqtt_logger = self.mqtt_logger(client_id)
+        self._active_mqtt_logger = client_id
+        mqtt_logger.start(topic)
+        self.append_cleanup(mqtt_logger.stop)
 
     @keyword("Stop MQTT Logger")
-    def stop_mqtt_logger(self) -> List[Any]:
+    def stop_mqtt_logger(self, client_id: Optional[str] = None) -> List[Any]:
         """Stop the MQTT Logger"""
-        return self._mqtt_logger.stop()
+        return self.mqtt_logger(client_id).stop()
 
     @keyword("Publish MQTT Message")
-    def publish_mqtt_message(self, topic: str, message: str = "", qos: int = 1):
+    def publish_mqtt_message(
+        self,
+        topic: str,
+        message: str = "",
+        qos: int = 1,
+        client_id: Optional[str] = None,
+    ):
         """Publish an MQTT message"""
-        self._mqtt_logger.publish(topic, message, qos)
+        self.mqtt_logger(client_id).publish(topic, message, qos)
 
     @keyword("Should Have MQTT Messages")
     def assert_mqtt_messages(
@@ -912,6 +943,7 @@ class AWS:
         max_count: Optional[int] = None,
         date_from: Optional[RelativeTime] = None,
         date_to: Optional[RelativeTime] = None,
+        client_id: Optional[str] = None,
     ) -> List[Any]:
         """Assert the presence of an MQTT message
 
@@ -928,7 +960,7 @@ class AWS:
         Returns:
             List[Any]: List of matching MQTT messages
         """
-        messages = self._mqtt_logger.match_mqtt_messages(
+        messages = self.mqtt_logger(client_id).match_mqtt_messages(
             topic=topic, date_from=date_from, date_to=date_to
         )
 

@@ -46,4 +46,4 @@ Check if thing exists
 Throws an error if thing exists
     ${name}    AWS.Get Random Name
     AWS.Create Thing    ${name}
-    Run Keyword And Expect Error    ResourceExistsException*    AWS.Thing Should Not Exist    ${name}
+    Run Keyword And Expect Error    ResourceExistsException*    AWS.Thing Should Not Exist    ${name}    timeout=1

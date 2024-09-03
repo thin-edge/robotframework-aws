@@ -6,12 +6,10 @@ Library             AWS
 *** Test Cases ***
 
 Get Local Command Topic
-    ${name}    AWS.Start MQTT Logger
     ${topic}    AWS.Get Local Command Topic    example
     Should Be Equal    ${topic}     aws/cmd/example
 
 Get Cloud Command Topic
-    ${name}    AWS.Start MQTT Logger
     ${topic}    AWS.Get Cloud Command Topic    common_name=device001    topic_suffix=foo/bar
     Should Be Equal    ${topic}     thinedge/device001/cmd/foo/bar
 
