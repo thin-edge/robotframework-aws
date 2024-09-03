@@ -7,13 +7,13 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
 1. Install via pip
 
     ```sh
-    pip install git+https://github.com/reubenmiller/robotframework-aws.git@main
+    pip install git+https://github.com/thin-edge/robotframework-aws.git@main
     ```
 
     Or add it to your `requirements.txt` file
 
     ```sh
-    robotframework-aws @ git+https://github.com/reubenmiller/robotframework-aws.git@main
+    robotframework-aws @ git+https://github.com/thin-edge/robotframework-aws.git@main
     ```
 
     Then install it via
@@ -25,7 +25,7 @@ Robot Framework Library for AWS IoT in the context of thin-edge.io
     Alternatively you can install a specific version using:
 
     ```sh
-    robotframework-aws @ git+https://github.com/reubenmiller/robotframework-aws.git@0.0.7
+    robotframework-aws @ git+https://github.com/thin-edge/robotframework-aws.git@0.0.7
     ```
 
 2. Create a `.env` file with the following environment variables
