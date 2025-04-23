@@ -1,5 +1,4 @@
-"""AWS Robot Framework library
-"""
+"""AWS Robot Framework library"""
 
 import datetime
 import json

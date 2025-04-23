@@ -1,5 +1,4 @@
-"""AWS MQTT Logger
-"""
+"""AWS MQTT Logger"""
 
 import logging
 import re
