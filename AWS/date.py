@@ -1,5 +1,4 @@
-"""Date utils
-"""
+"""Date utils"""
 
 from datetime import datetime
 from typing import Union

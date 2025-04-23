@@ -1,5 +1,6 @@
-"""AWS Robot Framework library
-"""
+"""AWS Robot Framework library"""
+
+# pylint: disable=too-many-positional-arguments
 
 import datetime
 import json
