@@ -743,8 +743,9 @@ class AWS:
         policy_name: str = "",
         thing_type: str = "",
         auto_delete: bool = True,
+        certificate_pem: str = "",
     ) -> ThingData:
-        """Create thing with newly generated self-signed certificate (private and public key)
+        """Create thing with optionally generated self-signed certificate (private and public key)
 
         Random values are used for the name and policy name if they are not provided.
 
@@ -757,6 +758,7 @@ class AWS:
             thing_type (str, optional): Thing type. Defaults to None
             auto_delete (bool, optional): Automatically delete thing on suite teardown.
                 Defaults to True
+            certificate_pem (str, optional): Use give public certificate instead of generating one
         """
         if not name:
             name = self.get_random_name()
@@ -765,12 +767,16 @@ class AWS:
             policy_name = self.get_random_name()
             self.create_policy(name=policy_name, auto_delete=auto_delete)
 
-        cert_key_path = self.create_cert_private_key(auto_delete=auto_delete)
-        public_key = self.create_self_signed_certificate(
-            cert_key_path, common_name=name
-        )
+        private_key_pem = None
+        if not certificate_pem:
+            cert_key_path = self.create_cert_private_key(auto_delete=auto_delete)
+            certificate_pem = self.create_self_signed_certificate(
+                cert_key_path, common_name=name
+            )
+            private_key_pem = Path(cert_key_path).read_text(encoding="utf-8")
+
         cert_response = self.register_certificate(
-            public_key, policy_name=policy_name, auto_delete=auto_delete
+            certificate_pem, policy_name=policy_name, auto_delete=auto_delete
         )
         self.create_thing(
             name,
@@ -782,8 +788,8 @@ class AWS:
         return ThingData(
             name=name,
             policy_name=policy_name,
-            private_key=Path(cert_key_path).read_text(encoding="utf-8"),
-            public_key=public_key,
+            private_key=private_key_pem,
+            public_key=certificate_pem,
             url=self.get_iot_url(),
         )
 
