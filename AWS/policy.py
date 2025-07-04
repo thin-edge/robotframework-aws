@@ -40,7 +40,7 @@ class Policy:
     },
     {
       "Effect": "Allow",
-      "Action": "iot:Publish",
+      "Action": ["iot:Publish", "iot:RetainPublish"],
       "Resource": [
         "arn:aws:iot:{{REGION}}:{{ACCOUNT_ID}}:topic/thinedge/${iot:Connection.Thing.ThingName}/td",
         "arn:aws:iot:{{REGION}}:{{ACCOUNT_ID}}:topic/thinedge/${iot:Connection.Thing.ThingName}/td/*",
