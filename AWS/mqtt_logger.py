@@ -13,7 +13,6 @@ from paho.mqtt.matcher import MQTTMatcher
 
 from .date import to_date, RelativeTime
 
-
 # Configure logging
 logger = logging.getLogger("AWSIoTPythonSDK.core")
 logger.setLevel(logging.DEBUG)
