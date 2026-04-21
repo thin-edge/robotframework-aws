@@ -1,5 +1,7 @@
 """Random data generator"""
 
+import re
+
 import randomname
 
 
@@ -40,4 +42,4 @@ class RandomNameGenerator:
             # then one noun
             groups.append("n/")
 
-        return randomname.generate(*groups, sep=sep)
+        return re.sub(r"[^\w+=,.@-]", sep, randomname.generate(*groups, sep=sep))
