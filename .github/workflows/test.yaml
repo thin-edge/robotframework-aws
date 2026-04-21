@@ -15,8 +15,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: extractions/setup-just@v2
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - uses: extractions/setup-just@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install dependencies
@@ -58,18 +61,18 @@ jobs:
     steps:
       # Checkout either the PR or the branch
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "${{matrix.python-version}}"
           cache: 'pip'
           cache-dependency-path: |
             pyproject.toml
 
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v4
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -88,7 +91,7 @@ jobs:
         run: just test
       
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports-${{ matrix.os }}-${{ matrix.python-version }}
