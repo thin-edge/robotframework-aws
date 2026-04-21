@@ -18,6 +18,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || '' }}
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
